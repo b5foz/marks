@@ -21,12 +21,7 @@ function getCollectionColor(name: string, allNames: string[]): string {
 }
 
 const INITIAL_BOOKMARKS: BookmarkType[] = [
-  { id: '1', title: 'Linear', url: 'https://linear.app', description: 'Fast, focused project management for modern teams', collection: 'Engineering', category: 'Engineering', tags: ['tools', 'productivity'] },
-  { id: '2', title: 'Figma', url: 'https://figma.com', description: 'Collaborative design tool for teams', collection: 'Design', category: 'Design', tags: ['design', 'tools'] },
-  { id: '3', title: 'Vercel', url: 'https://vercel.com', description: 'Deploy web projects with zero configuration', collection: 'Engineering', category: 'Engineering', tags: ['deployment', 'infrastructure'] },
-  { id: '4', title: 'Type Scale', url: 'https://typescale.com', description: 'Visual typography scale tool', collection: 'Design', category: 'Design', tags: ['typography', 'design'] },
-  { id: '5', title: 'Refactoring Guru', url: 'https://refactoring.guru', description: 'Design patterns and refactoring techniques explained', collection: 'Reading', category: 'Reading', tags: ['programming', 'patterns'] },
-  { id: '6', title: 'Tailwind CSS', url: 'https://tailwindcss.com', description: 'Utility-first CSS framework', collection: 'Engineering', category: 'Engineering', tags: ['css', 'tools'] },
+  
 ];
 
 const COLORS = ['#EF4444','#F97316','#F59E0B','#EAB308','#84CC16','#22C55E','#10B981','#14B8A6','#06B6D4','#0EA5E9','#3B82F6','#6366F1','#8B5CF6','#A855F7','#D946EF','#EC4899','#F43F5E','#FB7185','#FDA4AF','#A3A3A3'];
