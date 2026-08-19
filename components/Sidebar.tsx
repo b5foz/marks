@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Hash, Plus, Inbox, Bookmark, Menu, X, BarChart2, Sun } from 'lucide-react';
+import { Hash, Plus, Inbox, Bookmark, Menu, X, BarChart2, Sun, LogOut } from 'lucide-react';
 import { Collection } from '../types';
 import '../app/globals.css';
 
@@ -9,6 +9,7 @@ interface SidebarProps {
   bookmarksCount: number;
   uncollectedCount: number;
   tagsCount: number;
+  allTags: { name: string, count: number }[];
   collections: Collection[];
   selectedCollection: string;
   setSelectedCollection: (collection: string) => void;
@@ -53,6 +54,7 @@ function SidebarContent({
   bookmarksCount,
   uncollectedCount,
   tagsCount,
+  allTags,
   collections,
   selectedCollection,
   onSelect,
@@ -63,6 +65,7 @@ function SidebarContent({
   bookmarksCount: number;
   uncollectedCount: number;
   tagsCount: number;
+  allTags: { name: string, count: number }[];
   collections: Collection[];
   selectedCollection: string;
   onSelect: (id: string) => void;
@@ -93,7 +96,6 @@ function SidebarContent({
         <div className="nav-group">
           <NavItem id="All Bookmarks" icon={BarChart2} label="All Bookmarks" count={bookmarksCount} selectedCollection={selectedCollection} onSelect={onSelect} />
           <NavItem id="Uncollected" icon={Inbox} label="Uncollected" selectedCollection={selectedCollection} onSelect={onSelect} />
-          <NavItem id="Tags" icon={Hash} label="Tags" count={tagsCount} selectedCollection={selectedCollection} onSelect={onSelect} />
         </div>
 
         <div className="collections-group" style={{ marginTop: '16px' }}>
@@ -114,7 +116,7 @@ function SidebarContent({
                   className={`sidebar-item ${active ? 'active' : ''}`}
                 >
                   <div className="sidebar-item-content">
-                    <div className="collection-color" style={{ background: COLORS[index % COLORS.length] }} />
+                    <div className="collection-color" style={{ background: col.color || COLORS[index % COLORS.length] }} />
                     <span>{col.name}</span>
                   </div>
                   <span className="sidebar-badge">{col.count}</span>
@@ -123,12 +125,45 @@ function SidebarContent({
             })}
           </div>
         </div>
+
+        <div className="tags-group" style={{ marginTop: '16px' }}>
+          <div className="collections-header">
+            <span>Tags</span>
+          </div>
+          <div className="nav-group">
+            {allTags?.map((tag) => {
+              const active = selectedCollection === `Tag: ${tag.name}`;
+              return (
+                <button
+                  key={tag.name}
+                  onClick={() => onSelect(`Tag: ${tag.name}`)}
+                  className={`sidebar-item ${active ? 'active' : ''}`}
+                >
+                  <div className="sidebar-item-content">
+                    <Hash className="sidebar-icon" size={16} />
+                    <span>{tag.name}</span>
+                  </div>
+                  <span className="sidebar-badge">{tag.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <div className="sidebar-footer">
-        <button className="theme-toggle-btn">
-          <Sun size={16} />
-          <span>Light mode</span>
+      <div className="sidebar-footer" style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+        <button 
+          className="sidebar-item" 
+          onClick={() => {
+            localStorage.clear();
+            window.location.reload();
+          }} 
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <div className="sidebar-item-content">
+            <LogOut className="sidebar-icon" size={16} />
+            <span>Sign Out</span>
+          </div>
         </button>
       </div>
     </div>
@@ -139,6 +174,7 @@ export default function Sidebar({
   bookmarksCount,
   uncollectedCount,
   tagsCount,
+  allTags,
   collections,
   selectedCollection,
   setSelectedCollection,
@@ -163,6 +199,7 @@ export default function Sidebar({
           bookmarksCount={bookmarksCount}
           uncollectedCount={uncollectedCount}
           tagsCount={tagsCount}
+          allTags={allTags}
           collections={collections}
           selectedCollection={selectedCollection}
           onSelect={handleSelect}
@@ -186,6 +223,7 @@ export default function Sidebar({
               bookmarksCount={bookmarksCount}
               uncollectedCount={uncollectedCount}
               tagsCount={tagsCount}
+              allTags={allTags}
               collections={collections}
               selectedCollection={selectedCollection}
               onSelect={handleSelect}

@@ -11,4 +11,5 @@ export interface BookmarkType {
 export interface Collection {
   name: string;
   count: number;
+  color?: string;
 }

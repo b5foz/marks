@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Search } from 'lucide-react';
 import { BookmarkType } from '../types';
 import '../app/globals.css';
@@ -14,7 +14,7 @@ export default function SearchBar({ bookmarks, onFilter }: SearchBarProps) {
   const [search, setSearch] = useState('');
   const [isFocused, setIsFocused] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (!search.trim()) {
       onFilter(bookmarks);
       return;
@@ -27,8 +27,7 @@ export default function SearchBar({ bookmarks, onFilter }: SearchBarProps) {
       b.tags.some(t => t.toLowerCase().includes(query))
     );
     onFilter(results);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookmarks, search]);
+  }, [bookmarks, search, onFilter]);
 
   return (
     <div className={`search-container ${isFocused ? 'focused' : ''}`}>

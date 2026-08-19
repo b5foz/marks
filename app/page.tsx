@@ -39,29 +39,91 @@ function getDomain(url: string) {
 export default function Page() {
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>(INITIAL_BOOKMARKS);
   const [filteredBookmarks, setFilteredBookmarks] = useState<BookmarkType[]>(INITIAL_BOOKMARKS);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  const [customCollections, setCustomCollections] = useState<{name: string, color: string}[]>([]);
+
+  useEffect(() => {
+    const savedBookmarks = localStorage.getItem('marks_bookmarks');
+    if (savedBookmarks) {
+      try {
+        const parsed = JSON.parse(savedBookmarks);
+        if (Array.isArray(parsed)) {
+          setBookmarks(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to parse bookmarks', e);
+      }
+    }
+    const savedCollections = localStorage.getItem('marks_collections');
+    if (savedCollections) {
+      try {
+        const parsed = JSON.parse(savedCollections);
+        if (Array.isArray(parsed)) {
+          setCustomCollections(parsed);
+        }
+      } catch (e) {
+        console.error('Failed to parse collections', e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('marks_bookmarks', JSON.stringify(bookmarks));
+      localStorage.setItem('marks_collections', JSON.stringify(customCollections));
+    }
+  }, [bookmarks, customCollections, isLoaded]);
+
   useEffect(() => { setFilteredBookmarks(bookmarks); }, [bookmarks]);
 
   // Derived collections — auto-synced when bookmarks change
   const collections = useMemo<Collection[]>(() => {
-    const map: Record<string, number> = {};
-    bookmarks.forEach(b => { if (b.collection) map[b.collection] = (map[b.collection] || 0) + 1; });
-    return Object.entries(map).map(([name, count]) => ({ name, count }));
-  }, [bookmarks]);
+    const map: Record<string, { count: number, color?: string }> = {};
+    customCollections.forEach(c => {
+      map[c.name] = { count: 0, color: c.color };
+    });
+    bookmarks.forEach(b => {
+      if (b.collection) {
+        if (!map[b.collection]) {
+          map[b.collection] = { count: 0, color: getCollectionColor(b.collection, []) };
+        }
+        map[b.collection].count += 1;
+      }
+    });
+    return Object.entries(map).map(([name, data]) => ({ name, count: data.count, color: data.color }));
+  }, [bookmarks, customCollections]);
 
   const collectionNames = useMemo(() => collections.map(c => c.name), [collections]);
 
   // Unique tag count — auto-synced
-  const tagsCount = useMemo(() => new Set(bookmarks.flatMap(b => b.tags)).size, [bookmarks]);
+  const allTags = useMemo(() => {
+    const map: Record<string, number> = {};
+    bookmarks.forEach(b => {
+      b.tags.forEach(t => {
+        map[t] = (map[t] || 0) + 1;
+      });
+    });
+    return Object.entries(map).map(([name, count]) => ({ name, count })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [bookmarks]);
+  const tagsCount = allTags.length;
 
   const [selectedCollection, setSelectedCollection] = useState('All Bookmarks');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
+  const [addUrl, setAddUrl] = useState('');
+  const [addTitle, setAddTitle] = useState('');
+  const [addCollection, setAddCollection] = useState('');
   const [showNewCollection, setShowNewCollection] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
   const [selectedColor, setSelectedColor] = useState(COLORS[0]);
 
   const [editingBookmark, setEditingBookmark] = useState<BookmarkType | null>(null);
   const [editUrl, setEditUrl] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editTags, setEditTags] = useState('');
+  const [editCollection, setEditCollection] = useState('');
 
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -80,11 +142,54 @@ export default function Page() {
     return () => document.removeEventListener('mousedown', onOutside);
   }, [openMenuId]);
 
+  const openAddModal = (show: boolean) => {
+    if (show) {
+      setAddUrl('');
+      setAddTitle('');
+      const def = !['All Bookmarks', 'Uncollected', 'Tags'].includes(selectedCollection) && !selectedCollection.startsWith('Tag: ') ? selectedCollection : '';
+      setAddCollection(def);
+      setShowAddBookmark(true);
+    } else {
+      setShowAddBookmark(false);
+    }
+  };
+
+  const handleAddBookmark = () => {
+    if (!addUrl.trim()) return;
+    const newBookmark: BookmarkType = {
+      id: Date.now().toString(),
+      url: addUrl.trim(),
+      title: addTitle.trim() || addUrl.trim(),
+      description: '',
+      collection: addCollection,
+      category: 'Uncategorized',
+      tags: []
+    };
+    setBookmarks(prev => [newBookmark, ...prev]);
+    setShowAddBookmark(false);
+    setAddUrl('');
+    setAddTitle('');
+    setAddCollection('');
+  };
+
+
+  const handleCreateCollection = () => {
+    if (!newCollectionName.trim()) return;
+    const exists = customCollections.some(c => c.name.toLowerCase() === newCollectionName.trim().toLowerCase());
+    if (!exists) {
+      setCustomCollections(prev => [...prev, { name: newCollectionName.trim(), color: selectedColor }]);
+    }
+    setShowNewCollection(false);
+    setNewCollectionName('');
+  };
+
   const handleEdit = (bookmark: BookmarkType) => {
     setEditingBookmark(bookmark);
     setEditUrl(bookmark.url);
     setEditTitle(bookmark.title);
     setEditDesc(bookmark.description);
+    setEditTags(bookmark.tags.join(', '));
+    setEditCollection(bookmark.collection || '');
     setOpenMenuId(null);
   };
 
@@ -93,7 +198,14 @@ export default function Page() {
     setBookmarks(prev =>
       prev.map(b =>
         b.id === editingBookmark.id
-          ? { ...b, url: editUrl.trim(), title: editTitle.trim(), description: editDesc.trim() }
+          ? { 
+              ...b, 
+              url: editUrl.trim(), 
+              title: editTitle.trim(), 
+              description: editDesc.trim(),
+              collection: editCollection,
+              tags: editTags.split(',').map(t => t.trim()).filter(Boolean)
+            }
           : b
       )
     );
@@ -105,12 +217,16 @@ export default function Page() {
     setOpenMenuId(null);
   };
 
-  const isCollectionView = !['All Bookmarks', 'Uncollected', 'Tags'].includes(selectedCollection);
+  const isTagView = selectedCollection.startsWith('Tag: ');
+  const isCollectionView = !['All Bookmarks', 'Uncollected', 'Tags'].includes(selectedCollection) && !isTagView;
 
   const displayBookmarks = filteredBookmarks.filter(b => {
     if (selectedCollection === 'All Bookmarks') return true;
     if (selectedCollection === 'Uncollected') return !b.collection;
-    if (selectedCollection === 'Tags') return true;
+    if (selectedCollection.startsWith('Tag: ')) {
+      const tag = selectedCollection.replace('Tag: ', '');
+      return b.tags.includes(tag);
+    }
     return b.collection === selectedCollection;
   });
 
@@ -131,10 +247,11 @@ export default function Page() {
         bookmarksCount={bookmarks.length}
         uncollectedCount={bookmarks.filter(b => !b.collection).length}
         tagsCount={tagsCount}
+        allTags={allTags}
         collections={collections}
         selectedCollection={selectedCollection}
         setSelectedCollection={setSelectedCollection}
-        setShowModal={setShowAddBookmark}
+        setShowModal={openAddModal}
       />
 
       <main className="main-content">
@@ -150,8 +267,12 @@ export default function Page() {
               </button>
             </div>
             <div className="collection-detail-title-row">
-              <div className="collection-dot-lg" style={{ background: getCollectionColor(selectedCollection, collectionNames) }} />
-              <h2 className="page-title">{selectedCollection}</h2>
+              {isTagView ? (
+                 <Hash size={24} style={{ marginRight: '12px' }} />
+              ) : (
+                 <div className="collection-dot-lg" style={{ background: collections.find(c => c.name === selectedCollection)?.color || getCollectionColor(selectedCollection, collectionNames) }} />
+              )}
+              <h2 className="page-title">{isTagView ? selectedCollection.replace('Tag: ', '#') : selectedCollection}</h2>
             </div>
           </div>
         ) : (
@@ -214,15 +335,28 @@ export default function Page() {
       </main>
 
       {showAddBookmark && (
-        <div className="modal-overlay" onClick={() => setShowAddBookmark(false)}>
+        <div className="modal-overlay" onClick={() => openAddModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowAddBookmark(false)}><X size={20} /></button>
+            <button className="modal-close" onClick={() => openAddModal(false)}><X size={20} /></button>
             <h3 className="modal-title serif-text">Add Bookmark</h3>
             <p className="modal-subtitle">Save a new link to your archive.</p>
-            <div className="modal-field"><label className="modal-label">URL</label><input type="text" className="modal-input" placeholder="https://..." autoFocus /></div>
-            <div className="modal-field"><label className="modal-label">Title</label><input type="text" className="modal-input" placeholder="Optional" /></div>
+            <div className="modal-field">
+              <label className="modal-label">URL</label>
+              <input type="text" className="modal-input" placeholder="https://..." value={addUrl} onChange={e => setAddUrl(e.target.value)} autoFocus />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Title</label>
+              <input type="text" className="modal-input" placeholder="Optional" value={addTitle} onChange={e => setAddTitle(e.target.value)} />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Collection</label>
+              <select className="modal-input" value={addCollection} onChange={e => setAddCollection(e.target.value)}>
+                <option value="">None</option>
+                {collectionNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
-              <button style={btnStyle()} onClick={() => setShowAddBookmark(false)}>Save</button>
+              <button style={btnStyle()} onClick={handleAddBookmark}>Save</button>
             </div>
           </div>
         </div>
@@ -246,6 +380,17 @@ export default function Page() {
               <label className="modal-label">Description</label>
               <textarea className="modal-input modal-textarea" value={editDesc} onChange={e => setEditDesc(e.target.value)} rows={3} />
             </div>
+            <div className="modal-field">
+              <label className="modal-label">Tags (comma separated)</label>
+              <input type="text" className="modal-input" value={editTags} onChange={e => setEditTags(e.target.value)} placeholder="design, inspiration, frontend" />
+            </div>
+            <div className="modal-field">
+              <label className="modal-label">Collection</label>
+              <select className="modal-input" value={editCollection} onChange={e => setEditCollection(e.target.value)}>
+                <option value="">None</option>
+                {collectionNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '32px' }}>
               <button style={btnStyle('ghost')} onClick={() => setEditingBookmark(null)}>Cancel</button>
               <button style={btnStyle()} onClick={handleSaveEdit}>Save changes</button>
@@ -255,12 +400,15 @@ export default function Page() {
       )}
 
       {showNewCollection && (
-        <div className="modal-overlay" onClick={() => setShowNewCollection(false)}>
+        <div className="modal-overlay" onClick={() => { setShowNewCollection(false); setNewCollectionName(''); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setShowNewCollection(false)}><X size={20} /></button>
+            <button className="modal-close" onClick={() => { setShowNewCollection(false); setNewCollectionName(''); }}><X size={20} /></button>
             <h3 className="modal-title serif-text">New Collection</h3>
             <p className="modal-subtitle">Group related bookmarks together.</p>
-            <div className="modal-field"><label className="modal-label">Name</label><input type="text" className="modal-input" placeholder="e.g. Design Inspiration" autoFocus /></div>
+            <div className="modal-field">
+              <label className="modal-label">Name</label>
+              <input type="text" className="modal-input" placeholder="e.g. Design Inspiration" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} autoFocus />
+            </div>
             <div className="modal-field" style={{ marginTop: '24px' }}>
               <label className="modal-label" style={{ marginBottom: '12px' }}>Color</label>
               <div className="color-picker-grid">
@@ -270,7 +418,7 @@ export default function Page() {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '32px' }}>
-              <button style={btnStyle()} onClick={() => setShowNewCollection(false)}>Create</button>
+              <button style={btnStyle()} onClick={handleCreateCollection}>Create</button>
             </div>
           </div>
         </div>
